@@ -1,0 +1,34 @@
+# Reusable Screenshot Workflow
+#
+# Takes a screenshot and stores it with a descriptive name.
+
+name: capture
+version: "1.0"
+description: Take a named screenshot
+
+params:
+  name:
+    type: string
+    required: true
+    description: Screenshot label
+  full_page:
+    type: boolean
+    default: false
+
+steps:
+  # full_page is a boolean — templating it into the action would render a
+  # string that as_bool() rejects (always false). Branch with if: instead.
+  - id: take_viewport
+    action: screenshot
+    path: "data/screenshots/{{params.name}}.png"
+    full_page: false
+    if: "{{params.full_page}} != true"
+
+  - id: take_full
+    action: screenshot
+    path: "data/screenshots/{{params.name}}.png"
+    full_page: true
+    if: "{{params.full_page}} == true"
+
+output:
+  path: "data/screenshots/{{params.name}}.png"

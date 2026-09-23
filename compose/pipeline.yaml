@@ -1,0 +1,99 @@
+# Composed Workflow Example
+#
+# Demonstrates workflow composition using `call` to invoke reusable sub-workflows.
+# Instead of one massive YAML file, break flows into reusable building blocks:
+#
+#   pipeline.yaml
+#   ├── call: login.yaml       (authenticate)
+#   ├── ... do work ...
+#   ├── call: capture.yaml     (screenshot results)
+#   └── on_error: capture.yaml (screenshot on failure)
+#
+# Sub-workflows:
+#   - login.yaml   — reusable login flow (accepts url, username, password)
+#   - capture.yaml — reusable screenshot (accepts name, full_page)
+
+name: compose_pipeline
+version: "1.0"
+description: Demonstrates workflow composition with call action
+
+browser:
+  headless: false
+
+params:
+  site_url:
+    type: string
+    default: "https://example.com/login"
+  username:
+    type: string
+    default: "demo"
+  password:
+    type: string
+    default: "demo123"
+  settings_path:
+    type: string
+    default: "/settings"
+    description: "Path appended to the site origin (not the full post-login URL)"
+
+steps:
+  # 1. Call the reusable login workflow
+  - id: auth
+    action: call
+    workflow: compose/login
+    params:
+      url: "{{params.site_url}}"
+      username: "{{params.username}}"
+      password: "{{params.password}}"
+    store_as: login_result
+
+  - action: log
+    message: "Login complete — redirected to {{store.login_result.url}}"
+
+  # 2. Derive settings URL from the site origin (login_result.url may include
+  #    a path/query — do not blindly append /settings to it)
+  - id: settings_url
+    action: eval
+    script: |
+      (function() {
+        var site = {{params.site_url | json}};
+        var path = {{params.settings_path | json}} || '/settings';
+        try {
+          var u = new URL(site);
+          if (!path.startsWith('/')) path = '/' + path;
+          return u.origin + path;
+        } catch (e) {
+          var base = String(site).replace(/[?#].*$/, '').replace(/\/+$/, '');
+          base = base.replace(/\/[^/]*$/, '');
+          if (!path.startsWith('/')) path = '/' + path;
+          return base + path;
+        }
+      })();
+    store_as: settings_url
+
+  - action: goto
+    url: "{{store.settings_url}}"
+
+  - action: wait_for
+    selector: "body"
+    timeout: 5000
+
+  # 3. Capture a screenshot using the reusable capture workflow
+  - action: call
+    workflow: compose/capture
+    params:
+      name: "settings_page"
+      full_page: true
+    store_as: screenshot_result
+
+  - action: log
+    message: "Screenshot saved to {{store.screenshot_result.path}}"
+
+output:
+  login: "{{store.login_result}}"
+  screenshot: "{{store.screenshot_result.path}}"
+
+on_error:
+  screenshot: true
+  steps:
+    - action: log
+      message: "Pipeline failed — check screenshots"
