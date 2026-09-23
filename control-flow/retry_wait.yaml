@@ -1,0 +1,100 @@
+# Retry & Wait Workflow
+#
+# Demonstrates:
+#   - wait_for states: visible (default), present, absent/hidden, text:
+#   - sleep with numeric ms (string durations are silently ignored -> 1000ms)
+#   - step-level retry: {max, delay_ms}
+#   - on_error screenshot + emit for the failure path
+#
+# Notes:
+#   - timeout is numeric milliseconds (string "5s" falls back to 30000)
+#   - step-level on_success / on_failure parse but are NOT executed by the engine
+#   - there is no `loop` action in the runtime registry
+
+name: retry_wait
+version: "1.0"
+description: wait_for states, sleep, retry, and failure handling
+
+browser:
+  headless: true
+
+steps:
+  - id: navigate
+    action: goto
+    url: "https://example.com"
+    retry:
+      max: 2
+      delay_ms: 1000
+
+  # state: visible — element exists and is visible (default)
+  - id: wait_visible
+    action: wait_for
+    selector: "h1"
+    state: visible
+    timeout: 10000
+
+  # Wait until body text appears
+  - id: wait_text
+    action: wait_for
+    text: "Example Domain"
+    timeout: 10000
+
+  # state: present — exists in DOM (even if hidden); here it also implies visible
+  - id: wait_present
+    action: wait_for
+    selector: "a"
+    state: present
+    timeout: 5000
+
+  # state: absent — element must not be in the DOM (this one never exists)
+  - id: wait_absent
+    action: wait_for
+    selector: "#definitely-not-on-this-page"
+    state: absent
+    timeout: 2000
+
+  # state: hidden alias also accepted
+  - id: wait_hidden
+    action: wait_for
+    selector: "#also-missing"
+    state: hidden
+    timeout: 2000
+
+  # sleep takes numeric ms (duration strings are ignored by as_u64)
+  - id: pause
+    action: sleep
+    ms: 300
+
+  # A flaky-looking step protected by retry — succeeds on first attempt here
+  - id: extract_with_retry
+    action: extract
+    selector: "h1"
+    as: heading
+    retry:
+      max: 3
+      delay_ms: 500
+
+  - action: log
+    message: "Heading after retries: {{store.heading}}"
+
+  - id: screenshot
+    action: screenshot
+    path: "data/screenshots/retry_wait.png"
+
+  # Failure path demo (commented): change the selector above to something
+  # missing and lower the wait timeout — on_error below will fire.
+  #   on_error:
+  #     screenshot: true
+  #     emit: { event: retry_wait_failed }
+
+output:
+  heading: "{{store.heading}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: retry_wait_failed
+  steps:
+    - action: log
+      level: error
+      message: "retry_wait failed: {{store._error.message}}"

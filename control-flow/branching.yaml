@@ -1,0 +1,98 @@
+# Control-Flow Branching Workflow
+#
+# Demonstrates:
+#   - action: condition  with then/else branches (and nesting)
+#   - step-level if:     to skip a single step
+#   - emit               to publish events on the result bus
+#   - on_complete / on_error  workflow lifecycle handlers
+#
+# Condition syntax (evaluate_condition):
+#   templates rendered -> whole string lowercased -> `x == y` / `x != y`
+#   else truthiness: true/yes/1 vs false/no/0/""/null/none
+
+name: branching
+version: "1.0"
+description: Condition branches, step-level if, emit, lifecycle handlers
+
+params:
+  mode:
+    type: string
+    default: "ok"
+    description: "ok | fail — drives which branch runs"
+
+steps:
+  # Seed store based on params.mode
+  - action: condition
+    if: "{{params.mode}} == ok"
+    then:
+      - action: eval
+        script: "({ status: 'ready', code: 200 })"
+        store_as: state
+    else:
+      - action: eval
+        script: "({ status: 'degraded', code: 503 })"
+        store_as: state
+
+  # Nested condition inside then:
+  - action: condition
+    if: "{{store.state.status}} == ready"
+    then:
+      - action: condition
+        if: "{{store.state.code}} == 200"
+        then:
+          - action: emit
+            event: branch_taken
+            data:
+              path: "ready/200"
+          - action: log
+            message: "Took the ready/200 path"
+        else:
+          - action: log
+            level: warn
+            message: "Ready but unexpected code {{store.state.code}}"
+    else:
+      - action: emit
+        event: degraded
+        data:
+          status: "{{store.state.status}}"
+      - action: log
+        level: warn
+        message: "Degraded path: {{store.state.status}}"
+
+  # Step-level if: runs only when the condition is true
+  - id: only_when_ok
+    action: log
+    message: "This line only runs when mode=ok"
+    if: "{{params.mode}} == ok"
+
+  - id: only_when_not_ok
+    action: log
+    message: "This line only runs when mode is not ok"
+    if: "{{params.mode}} != ok"
+
+  # Flip a flag for the demo output regardless of branch
+  - action: eval
+    script: "({ mode: {{params.mode | json}}, handled: true })"
+    store_as: summary
+
+output:
+  mode: "{{store.summary.mode}}"
+  state: "{{store.state}}"
+
+# Runs after successful step execution
+on_complete:
+  emit:
+    event: branching_complete
+  steps:
+    - action: log
+      message: "branching finished for mode={{params.mode}}"
+
+# Runs when any step fails (screenshot + emit + recovery steps)
+on_error:
+  screenshot: true
+  emit:
+    event: branching_failed
+  steps:
+    - action: log
+      level: error
+      message: "branching failed at step {{store._error.step}}: {{store._error.message}}"

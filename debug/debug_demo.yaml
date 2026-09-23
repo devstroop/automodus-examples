@@ -1,0 +1,82 @@
+# Debug Mode Demo Workflow
+#
+# Shows workflow-level and step-level debug configuration.
+#
+# Workflow-level debug fields that the engine honors from YAML:
+#   enabled, level (info|debug|trace), capture (none|failure|before|after|all),
+#   highlight, delay (ms), console, network, pause
+#
+# `profile:` is valid schema but IGNORED when running via `automodus run`
+# (the CLI merge path does not call with_profile()). Use CLI instead:
+#   automodus run examples/debug/debug_demo.yaml --profile=demo
+#   automodus run examples/debug/debug_demo.yaml --debug --delay=1000
+#
+# Step-level debug: overlays on the workflow-level config for that step only.
+
+name: debug_demo
+version: "1.0"
+description: Workflow-level and step-level debug configuration
+
+browser:
+  headless: false
+
+debug:
+  enabled: true
+  level: debug
+  capture: failure   # screenshot automatically on step failure
+  highlight: true    # flash a red border before interactions
+  delay: 400         # ms pause before each step (slow the run down to watch)
+  console: true      # capture browser console output
+  network: true      # capture network requests
+
+steps:
+  - id: navigate
+    action: goto
+    url: "https://example.com"
+
+  - id: wait_ready
+    action: wait_for
+    selector: "h1"
+    timeout: 10000
+
+  # Step-level override: no delay/highlight on this step, capture everything
+  - id: extract_heading
+    action: extract
+    selector: "h1"
+    as: heading
+    debug:
+      enabled: true
+      delay: 0
+      highlight: false
+      capture: all
+
+  # Back to workflow-level debug for the rest
+  - id: click_link
+    action: click
+    selector: "a[href*='iana']"
+
+  - id: wait_nav
+    action: wait_for
+    selector: "body"
+    timeout: 10000
+
+  - id: screenshot
+    action: screenshot
+    path: "data/screenshots/debug_demo.png"
+
+  - action: log
+    message: "Debug demo finished — heading was {{store.heading}}"
+
+output:
+  heading: "{{store.heading}}"
+
+# Failure path: capture is already `failure` via debug.capture,
+# but on_error still emits + logs for callers watching the event bus.
+on_error:
+  screenshot: true
+  emit:
+    event: debug_demo_failed
+  steps:
+    - action: log
+      level: error
+      message: "debug_demo failed: {{store._error.message}}"
