@@ -66,16 +66,17 @@ automodus run auth/check_status.yaml
 
 ## `call` resolution rules
 
-`WorkflowLoader` resolves `workflow:` relative to `AUTOMODUS_WORKFLOWS` (walks up to 3 parent dirs, no recursive subdirectory search). When running a single file via `automodus run`, `AUTOMODUS_WORKFLOWS` wins; otherwise the file's parent directory is used:
+`WorkflowLoader` resolves `workflow:` relative to `AUTOMODUS_WORKFLOWS` (walks up to 3 parent dirs, no recursive subdirectory search). When running a single file via `automodus run`, `AUTOMODUS_WORKFLOWS` wins; otherwise the file's parent directory is used.
+
+**All `workflow:` paths in this repo are pack-root-relative to `examples/`** (e.g. `whatsapp/_common/ensure_ready`, `compose/login`). That form resolves from `AUTOMODUS_WORKFLOWS=examples/` and also via walk-up when the workflows dir is the file's parent:
 
 | Workflows dir | Call | Resolves to |
 |---|---|---|
 | `examples/` | `compose/login` | `examples/compose/login.yaml` |
 | `examples/` | `whatsapp/whatsapp` | `examples/whatsapp/whatsapp.yaml` |
-| `examples/whatsapp/` | `auth/check_status` | `examples/whatsapp/auth/check_status.yaml` |
-| `examples/whatsapp/` | `_common/ensure_ready` | `examples/whatsapp/_common/ensure_ready.yaml` |
-
-So: cross-pack calls from root use `<pack>/<path>`; intra-pack calls use paths relative to the pack root. `compose/pipeline.yaml` and `whatsapp/whatsapp.yaml` already follow this.
+| `examples/` | `whatsapp/auth/check_status` | `examples/whatsapp/auth/check_status.yaml` |
+| `examples/` | `whatsapp/_common/ensure_ready` | `examples/whatsapp/_common/ensure_ready.yaml` |
+| `examples/whatsapp/` | `whatsapp/_common/ensure_ready` | walks up → `examples/whatsapp/_common/ensure_ready.yaml` |
 
 ## Engine caveats (read before authoring)
 
@@ -91,9 +92,13 @@ These are real engine behaviors, not style preferences:
 | `full_page: "{{params.x}}"` | Templated string → `as_bool` always **false** | Two `if:`-gated screenshot steps (see `browser/screenshot.yaml`) |
 | `debug: profile: verbose` in YAML | Valid schema; **ignored** on `automodus run` merge path | CLI `--profile=verbose`, or set explicit `enabled/delay/capture/...` |
 | `on:` triggers (schedule/event/webhook) | Schema-only; never auto-fired by the engine | Run with `automodus run` or `POST /api/workflows/:name/run` |
-| Condition string | Whole string **lowercased**, then `==` / `!=`, else truthiness | `{{store.x.status}} == 200` works; `== True` does not |
+| Condition string | Whole string **lowercased**, then `==` / `!=`, else truthiness | Unquoted RHS: `{{store.x.status}} == 200`, `{{params.action}} == send_text` — never `== 'send_text'` (quotes are compared literally) |
 | Header echo checks | Arrays render as JSON (`["Bearer x"]`) | Compare against `["Bearer x"]` (see `http/headers_auth.yaml`) |
+| `'{{params.x}}'` inside JS | Raw interpolation breaks on quotes / injects JS | Use `{{params.x \| json}}` (no surrounding quotes), or a native `type:` action input |
+| HTTP body field with template | Always rendered as YAML string unless full-string `{{path \| json}}` | `userId: "{{params.user_id \| json}}"` keeps number/bool/null type |
 
 Registered actions only: `goto/back/forward/reload`, `click/type/select/hover`, `wait_for/sleep`, `extract/eval`, `screenshot`, `tab.list/new/switch/close`, `emit/log`, `upload/wait_upload/file_chooser`, `http.get/post/put/patch/delete/request`, plus engine specials `call` and `condition`.
+
+Template filters: `{{path}}` (raw string) and `{{path | json}}` (JSON-encoded literal — missing paths become `null`). Prefer `| json` whenever the value is embedded in a JS expression.
 
 Stable public endpoints used here: `example.com`, `books.toscrape.com`, `httpbingo.org`, `jsonplaceholder.typicode.com`.
