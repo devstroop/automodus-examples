@@ -1,0 +1,116 @@
+# HTTP Headers & Auth Workflow
+#
+# Sends authenticated GET requests with custom headers and verifies the echo.
+# httpbingo.org/anything reflects the request (method, headers, args) as JSON.
+#
+# Response shape (HttpResponse):
+#   status, status_text, headers, body, ok, url
+# Body is auto-parsed as JSON when content-type allows.
+
+name: headers_auth
+version: "1.0"
+description: HTTP requests with Authorization and custom headers, verified via echo
+
+params:
+  token:
+    type: string
+    default: "demo-token-123"
+    description: Bearer token sent in Authorization header
+  source:
+    type: string
+    default: "automodus"
+    description: Value for the source query arg
+
+steps:
+  # Echo endpoint reflects headers + query args back in body
+  - id: authenticated_get
+    action: http.get
+    url: "https://httpbingo.org/anything?source={{params.source}}"
+    headers:
+      Authorization: "Bearer {{params.token}}"
+      X-Custom: "automodus-example"
+      Accept: "application/json"
+    store_as: echo
+
+  # Condition: whole rendered string is lowercased, then == / != / truthiness
+  - action: condition
+    if: "{{store.echo.status}} == 200"
+    then:
+      - action: log
+        message: "HTTP {{store.echo.status}} from {{store.echo.url}}"
+
+      - action: condition
+        if: "{{store.echo.body.method}} == get"
+        then:
+          - action: log
+            message: "Method echoed correctly"
+        else:
+          - action: log
+            level: error
+            message: "Unexpected method: {{store.echo.body.method}}"
+
+      # Header values are echoed as JSON arrays (e.g. ["Bearer ..."])
+      - action: condition
+        if: "{{store.echo.body.headers.Authorization}} == [\"Bearer {{params.token}}\"]"
+        then:
+          - action: log
+            message: "Authorization header echoed"
+        else:
+          - action: log
+            level: warn
+            message: "Authorization echo mismatch: {{store.echo.body.headers.Authorization}}"
+
+      - action: condition
+        if: "{{store.echo.body.headers.X-Custom}} == [\"automodus-example\"]"
+        then:
+          - action: log
+            message: "X-Custom header echoed"
+        else:
+          - action: log
+            level: warn
+            message: "X-Custom echo mismatch"
+    else:
+      - action: log
+        level: error
+        message: "Request failed with status {{store.echo.status}}"
+
+  # POST with JSON body — jsonplaceholder echoes the created resource
+  - id: post_json
+    action: http.post
+    url: "https://jsonplaceholder.typicode.com/posts"
+    headers:
+      Content-Type: "application/json"
+      X-Request-Source: "{{params.source}}"
+    body:
+      title: "Automodus headers_auth"
+      body: "Created with custom headers"
+      userId: 1
+    store_as: created
+
+  - action: condition
+    if: "{{store.created.status}} == 201"
+    then:
+      - action: log
+        message: "POST created id={{store.created.body.id}}"
+    else:
+      - action: log
+        level: error
+        message: "POST failed: {{store.created.status}}"
+
+output:
+  echo_status: "{{store.echo.status}}"
+  echo_url: "{{store.echo.url}}"
+  created_id: "{{store.created.body.id}}"
+  method: "{{store.echo.body.method}}"
+
+on_error:
+  emit:
+    event: headers_auth_failed
+  steps:
+    - action: log
+      level: error
+      message: "headers_auth failed: {{store._error.message}}"
+
+on_complete:
+  emit:
+    event: headers_auth_done
