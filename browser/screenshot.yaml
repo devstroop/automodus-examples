@@ -1,0 +1,60 @@
+# Screenshot Service Workflow
+#
+# Parametrized page screenshot: navigate, then capture viewport or full page.
+# `full_page` is a boolean that cannot be templated into the screenshot action
+# (as_bool on a rendered string is always false), so two if:-gated steps branch.
+
+name: screenshot_service
+version: "1.0"
+description: Take a viewport or full-page screenshot of any URL
+
+params:
+  url:
+    type: string
+    default: "https://example.com"
+    description: Page to capture
+  name:
+    type: string
+    default: "page"
+    description: "Screenshot label (file data/screenshots/<name>.png)"
+  full_page:
+    type: boolean
+    default: false
+    description: Capture the full scrollable page instead of the viewport
+
+steps:
+  - id: navigate
+    action: goto
+    url: "{{params.url}}"
+
+  - id: wait_ready
+    action: wait_for
+    selector: "body"
+    timeout: 15000
+
+  # Branch on the boolean param — conditions compare rendered strings
+  - id: capture_viewport
+    action: screenshot
+    path: "data/screenshots/{{params.name}}.png"
+    full_page: false
+    if: "{{params.full_page}} != true"
+
+  - id: capture_full
+    action: screenshot
+    path: "data/screenshots/{{params.name}}.png"
+    full_page: true
+    if: "{{params.full_page}} == true"
+
+  - id: log_done
+    action: log
+    message: "Saved data/screenshots/{{params.name}}.png (full_page={{params.full_page}})"
+
+output:
+  path: "data/screenshots/{{params.name}}.png"
+  url: "{{params.url}}"
+  full_page: "{{params.full_page}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: screenshot_failed

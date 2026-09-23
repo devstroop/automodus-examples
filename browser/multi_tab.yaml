@@ -1,0 +1,78 @@
+# Multi-Tab Workflow
+#
+# Opens a second tab, switches between tabs, lists them, then closes the extra tab.
+# Tab indices: the initial page is always 0; the first tab.new returns 1.
+# index must be a numeric literal — template-rendered strings fail as_u64().
+
+name: multi_tab
+version: "1.0"
+description: Open, switch, list, and close browser tabs
+
+browser:
+  headless: true
+
+steps:
+  - id: open_first
+    action: goto
+    url: "https://example.com"
+
+  # Opens tab index 1 and focuses it
+  - id: open_second
+    action: tab.new
+    url: "https://books.toscrape.com/"
+
+  - id: list_after_open
+    action: tab.list
+
+  # tab.list does not honor store_as; use the step id via {{steps.<id>}}
+  - action: log
+    message: "Tabs open: {{steps.list_after_open.count}}"
+
+  # Back to the original tab
+  - id: switch_home
+    action: tab.switch
+    index: 0
+
+  - id: verify_home
+    action: eval
+    script: "window.location.href"
+    store_as: home_url
+
+  - action: log
+    message: "Tab 0 is at {{store.home_url}}"
+
+  # Focus the second tab again
+  - id: switch_catalog
+    action: tab.switch
+    index: 1
+
+  - id: verify_catalog
+    action: wait_for
+    selector: ".product_pod"
+    timeout: 15000
+
+  # Close the extra tab explicitly by index (never rely on ctx default here)
+  - id: close_extra
+    action: tab.close
+    index: 1
+
+  - id: list_final
+    action: tab.list
+
+  - action: log
+    message: "Remaining tabs: {{steps.list_final.count}}"
+
+  # Ensure we finish on the original tab
+  - id: back_home
+    action: tab.switch
+    index: 0
+
+output:
+  home_url: "{{store.home_url}}"
+  open_count: "{{steps.list_after_open.count}}"
+  final_count: "{{steps.list_final.count}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: multi_tab_failed

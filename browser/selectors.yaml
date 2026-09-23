@@ -1,0 +1,130 @@
+# Extended Selectors Tour
+#
+# Demonstrates every selector prefix supported by Automodus:
+#   CSS        — plain querySelector syntax (default)
+#   text:      — exact text match (prefers clickable elements)
+#   text*:     — partial text match
+#   role:name  — ARIA role + accessible name, e.g. role:heading[...]
+#   xpath:     — raw XPath expression
+# Plus attribute extraction via extract.attribute.
+
+name: selectors_tour
+version: "1.0"
+description: Tour of CSS, text, role, and XPath selectors
+
+browser:
+  headless: true
+
+steps:
+  # Start from a known page — extracts below assume example.com is loaded
+  - id: open_example
+    action: goto
+    url: "https://example.com"
+
+  - id: wait_page
+    action: wait_for
+    selector: "h1"
+    timeout: 10000
+
+  # --- Plain CSS ---
+  - id: css_heading
+    action: extract
+    selector: "h1"
+    as: css_h1
+
+  - action: log
+    message: "CSS h1: {{store.css_h1}}"
+
+  # --- CSS attribute selector + extract attribute ---
+  - id: css_link_href
+    action: extract
+    selector: "a[href*='iana']"
+    attribute: href
+    as: iana_href
+
+  - action: log
+    message: "CSS attr href: {{store.iana_href}}"
+
+  # --- Exact text (clickable) ---
+  - id: wait_text
+    action: wait_for
+    text: "Example Domain"
+    timeout: 10000
+
+  - id: text_extract
+    action: extract
+    selector: "text:More information..."
+    attribute: href
+    as: more_info_href
+
+  - action: log
+    message: "text: link -> {{store.more_info_href}}"
+
+  # --- Partial text ---
+  - id: text_partial
+    action: extract
+    selector: "text*:More information"
+    as: partial_text
+
+  - action: log
+    message: "text*: {{store.partial_text}}"
+
+  # --- ARIA role + accessible name ---
+  - id: role_heading
+    action: extract
+    selector: "role:heading[Example Domain]"
+    as: role_heading_text
+
+  - action: log
+    message: "role:heading -> {{store.role_heading_text}}"
+
+  - id: role_link
+    action: click
+    selector: "role:link[More information...]"
+
+  # Follow the link, then go back for the XPath demo
+  - id: wait_nav
+    action: wait_for
+    selector: "body"
+    timeout: 10000
+
+  - id: go_back
+    action: back
+
+  - id: wait_home
+    action: wait_for
+    selector: "h1"
+    timeout: 10000
+
+  # --- XPath ---
+  - id: xpath_heading
+    action: extract
+    selector: "xpath://h1"
+    as: xpath_h1
+
+  - action: log
+    message: "xpath://h1 -> {{store.xpath_h1}}"
+
+  - id: xpath_count
+    action: eval
+    script: |
+      document.evaluate('//a', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).snapshotLength
+    store_as: link_count
+
+  - action: log
+    message: "XPath found {{store.link_count}} links"
+
+  - id: screenshot
+    action: screenshot
+    path: "data/screenshots/selectors_tour.png"
+
+output:
+  css_h1: "{{store.css_h1}}"
+  xpath_h1: "{{store.xpath_h1}}"
+  role_heading: "{{store.role_heading_text}}"
+  link_count: "{{store.link_count}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: selectors_failed

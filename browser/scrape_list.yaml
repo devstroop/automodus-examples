@@ -1,0 +1,76 @@
+# List Scraping Workflow
+#
+# Scrapes the Books to Scrape catalog: titles, prices, and star ratings.
+# Uses extract with many: true to pull arrays of values in one step.
+
+name: scrape_list
+version: "1.0"
+description: Scrape book titles, prices, and ratings from books.toscrape.com
+
+browser:
+  headless: true
+
+params:
+  limit:
+    type: number
+    default: 10
+    description: How many books to report in the log (scrape is always the full page)
+
+steps:
+  - id: navigate
+    action: goto
+    url: "https://books.toscrape.com/"
+
+  - id: wait_catalog
+    action: wait_for
+    selector: ".product_pod"
+    timeout: 15000
+
+  # Full titles come from the link's title attribute
+  - id: extract_titles
+    action: extract
+    selector: ".product_pod h3 a"
+    attribute: title
+    many: true
+    as: titles
+
+  - id: extract_prices
+    action: extract
+    selector: ".product_pod .price_color"
+    many: true
+    as: prices
+
+  # Star rating is encoded in the class list, e.g. "star-rating Three"
+  - id: extract_ratings
+    action: extract
+    selector: ".product_pod p.star-rating"
+    attribute: class
+    many: true
+    as: rating_classes
+
+  - id: count
+    action: eval
+    script: |
+      ({
+        count: document.querySelectorAll('.product_pod').length
+      })
+    store_as: catalog
+
+  - id: log_summary
+    action: log
+    message: "Scraped {{store.catalog.count}} books (showing first {{params.limit}} titles logged)"
+
+  - id: screenshot
+    action: screenshot
+    path: "data/screenshots/scrape_list.png"
+
+output:
+  total: "{{store.catalog.count}}"
+  titles: "{{store.titles}}"
+  prices: "{{store.prices}}"
+  ratings: "{{store.rating_classes}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: scrape_failed
