@@ -27,60 +27,79 @@ steps:
     script: |
       (function() {
         var phone = String({{params.phone | json}}).replace(/[^\d+]/g, '').replace(/^\+/, '');
+        var pane = document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]');
+        if (!pane) {
+          // Not authenticated / UI not ready — fail cleanly instead of throwing
+          return { ok: false, phone: phone, error: 'Chat pane not found (not authenticated?)' };
+        }
         var loader = document.querySelector('#phoneLoaderParent');
         if (!loader) {
-          document.querySelector('#pane-side').innerHTML += '<div id="phoneLoaderParent"></div>';
+          loader = document.createElement('div');
+          loader.id = 'phoneLoaderParent';
+          pane.appendChild(loader);
         }
         document.querySelector('#phoneLoaderParent').innerHTML = 
           '<a id="phoneLoader" href="https://api.whatsapp.com/send?phone=' + encodeURIComponent(phone) + '" style="display:none"></a>';
         document.querySelector('#phoneLoader').click();
         document.querySelector('#phoneLoaderParent').remove();
-        return phone;
+        return { ok: true, phone: phone, error: null };
       })();
-    store_as: cleaned_phone
+    store_as: nav_raw
 
-  - action: sleep
-    ms: 2000
+  - action: condition
+    if: "{{store.nav_raw.ok | json}} == false"
+    then:
+      - action: eval
+        script: |
+          ({
+            success: false,
+            phone: {{store.nav_raw.phone | json}},
+            error: {{store.nav_raw.error | json}}
+          })
+        store_as: result
+    else:
+      - action: sleep
+        ms: 2000
 
-  # Check for invalid phone dialog
-  - id: check_invalid
-    action: eval
-    script: |
-      (function() {
-        var dialog = document.querySelector('#app div[data-animate-modal-popup="true"] div[data-animate-modal-body="true"] div');
-        if (dialog && dialog.innerHTML.trim() === 'Phone number shared via url is invalid.') {
-          var btns = document.querySelectorAll('#app div[data-animate-modal-popup="true"] button');
-          if (btns.length > 0) btns[btns.length - 1].click();
-          return true;
-        }
-        return false;
-      })();
-    store_as: is_invalid
+      # Check for invalid phone dialog
+      - id: check_invalid
+        action: eval
+        script: |
+          (function() {
+            var dialog = document.querySelector('#app div[data-animate-modal-popup="true"] div[data-animate-modal-body="true"] div');
+            if (dialog && dialog.innerHTML.trim() === 'Phone number shared via url is invalid.') {
+              var btns = document.querySelectorAll('#app div[data-animate-modal-popup="true"] button');
+              if (btns.length > 0) btns[btns.length - 1].click();
+              return true;
+            }
+            return false;
+          })();
+        store_as: is_invalid
 
-  # Wait for message input (confirms chat is open)
-  - id: wait_for_input
-    action: eval
-    script: |
-      (async function() {
-        for (var i = 0; i < 50; i++) {
-          if (document.querySelector("#app #main footer div[aria-placeholder='Type a message']")) {
-            return true;
-          }
-          await new Promise(r => setTimeout(r, 200));
-        }
-        return false;
-      })();
-    store_as: chat_ready
+      # Wait for message input (confirms chat is open)
+      - id: wait_for_input
+        action: eval
+        script: |
+          (async function() {
+            for (var i = 0; i < 50; i++) {
+              if (document.querySelector("#app #main footer div[aria-placeholder='Type a message']")) {
+                return true;
+              }
+              await new Promise(r => setTimeout(r, 200));
+            }
+            return false;
+          })();
+        store_as: chat_ready
 
-  - id: build_result
-    action: eval
-    script: |
-      ({
-        success: {{store.is_invalid | json}} ? false : {{store.chat_ready | json}},
-        phone: {{store.cleaned_phone | json}},
-        error: {{store.is_invalid | json}} ? 'Invalid phone number' : ({{store.chat_ready | json}} ? null : 'Chat did not open')
-      })
-    store_as: result
+      - id: build_result
+        action: eval
+        script: |
+          ({
+            success: {{store.is_invalid | json}} ? false : {{store.chat_ready | json}},
+            phone: {{store.nav_raw.phone | json}},
+            error: {{store.is_invalid | json}} ? 'Invalid phone number' : ({{store.chat_ready | json}} ? null : 'Chat did not open')
+          })
+        store_as: result
 
 output:
   success: "{{store.result.success}}"

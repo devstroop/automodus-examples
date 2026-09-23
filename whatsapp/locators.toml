@@ -91,12 +91,18 @@ qr_code_base64 = """
 navigate_to_phone = """
 (function(phone) {
     var cleaned = phone.replace(/[^\\d+]/g, '').replace(/^\\+/, '');
+    var pane = document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]');
+    if (!pane) {
+        return false;
+    }
     var loader = document.querySelector('#phoneLoaderParent');
     if (!loader) {
-        document.querySelector('#pane-side').innerHTML += '<div id=\"phoneLoaderParent\"></div>';
+        loader = document.createElement('div');
+        loader.id = 'phoneLoaderParent';
+        pane.appendChild(loader);
     }
     document.querySelector('#phoneLoaderParent').innerHTML = 
-        '<a id=\"phoneLoader\" href=\"https://api.whatsapp.com/send?phone=' + cleaned + '\" style=\"display:none\"></a>';
+        '<a id=\\"phoneLoader\\" href=\\"https://api.whatsapp.com/send?phone=' + cleaned + '\\" style=\\"display:none\\"></a>';
     document.querySelector('#phoneLoader').click();
     document.querySelector('#phoneLoaderParent').remove();
     return true;
