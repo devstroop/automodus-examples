@@ -133,7 +133,7 @@ steps:
         script: |
           (function() {
             var messages = [];
-            var limit = {{params.limit}};
+            var limit = {{params.limit | json}};
             var msgElements = document.querySelectorAll('[data-id]');
             
             msgElements.forEach(function(el) {

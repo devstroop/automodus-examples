@@ -47,7 +47,7 @@ steps:
             var rows = document.querySelectorAll('[data-testid="cell-frame-container"], div[role="listitem"], div[role="row"]');
             
             rows.forEach(function(row, index) {
-              if (index >= {{params.limit}}) return;
+              if (index >= {{params.limit | json}}) return;
               
               try {
                 // Get chat name

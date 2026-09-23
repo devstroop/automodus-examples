@@ -180,7 +180,7 @@ steps:
       - action: call
         workflow: whatsapp/chat/get_chats
         params:
-          limit: "{{params.limit}}"
+          limit: "{{params.limit | json}}"
         store_as: result
 
   # ── Chat: get_messages ──────────────────────────────────────────
@@ -191,8 +191,8 @@ steps:
         workflow: whatsapp/chat/get_messages
         params:
           chat_id: "{{params.chat_id}}"
-          limit: "{{params.limit}}"
-          load_more: "{{params.load_more}}"
+          limit: "{{params.limit | json}}"
+          load_more: "{{params.load_more | json}}"
         store_as: result
 
   # ── Chat: navigate ──────────────────────────────────────────────
