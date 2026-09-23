@@ -62,8 +62,17 @@ steps:
           if (!path.startsWith('/')) path = '/' + path;
           return u.origin + path;
         } catch (e) {
-          var base = String(site).replace(/[?#].*$/, '').replace(/\/+$/, '');
-          base = base.replace(/\/[^/]*$/, '');
+          // Fallback: keep scheme://host[:port], drop path/query/hash only
+          var base = String(site).replace(/[?#].*$/, '');
+          var m = base.match(/^([a-z][a-z0-9+.-]*:\/\/[^/]+)/i);
+          if (m) {
+            base = m[1];
+          } else {
+            // No scheme — keep first segment only (host-like), drop any path
+            base = base.replace(/\/+$/, '');
+            var slash = base.indexOf('/');
+            if (slash !== -1) base = base.substring(0, slash);
+          }
           if (!path.startsWith('/')) path = '/' + path;
           return base + path;
         }
