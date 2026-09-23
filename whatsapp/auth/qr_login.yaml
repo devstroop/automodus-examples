@@ -1,0 +1,134 @@
+# WhatsApp QR Code Login Workflow
+#
+# Authenticates to WhatsApp Web using QR code.
+# Returns the QR code image data (base64) for display.
+#
+# Usage:
+#   - Call this workflow to get the QR code
+#   - Display the QR code to the user
+#   - User scans with their phone
+#   - Check auth status with check_status.yaml
+
+name: whatsapp_qr_login
+version: "1.0"
+description: Get WhatsApp Web QR code for authentication
+
+browser:
+  headless: false
+  data_dir: "data/whatsapp_profile"
+  width: 1280
+  height: 800
+
+on:
+  api:
+    path: /whatsapp/auth/qr
+    method: GET
+
+vars:
+  whatsapp_url: "https://web.whatsapp.com"
+  qr_selector: "[aria-label='Scan this QR code to link a device!']"
+  auth_pane_selector: "#pane-side"
+  qr_reload_selector: "[data-icon='refresh-large']"
+
+steps:
+  # 1. Ensure WhatsApp Web is loaded
+  - action: call
+    workflow: whatsapp/_common/ensure_ready
+    store_as: ready
+
+  # 2. If already authenticated, return early
+  - action: condition
+    if: "{{store.ready.authorized}} == true"
+    then:
+      - action: log
+        message: "Already authenticated to WhatsApp Web"
+      - action: eval
+        script: "({ status: 'already_authenticated', qr_code: null })"
+        store_as: result
+    else:
+      # 3. Wait briefly for the login pane to settle
+      - action: sleep
+        ms: 1500
+
+      # 4. If QR is missing, try refreshing it (step-level on_failure is
+      #    never executed by the engine — use an explicit condition instead)
+      - id: check_qr_visible
+        action: eval
+        script: |
+          !!document.querySelector("[aria-label='Scan this QR code to link a device!']")
+        store_as: qr_visible
+
+      - action: condition
+        if: "{{store.qr_visible}} == false"
+        then:
+          - id: try_reload_qr
+            action: eval
+            script: |
+              (function() {
+                var btn = document.querySelector("[data-icon='refresh-large']") ||
+                          document.querySelector('button[aria-label*="refresh" i]') ||
+                          document.querySelector('span[data-icon="refresh-large"]')?.closest('button');
+                if (btn) { btn.click(); return true; }
+                return false;
+              })();
+            store_as: reloaded
+          - action: sleep
+            ms: 1500
+          - id: wait_for_qr
+            action: wait_for
+            selector: "{{vars.qr_selector}}"
+            timeout: 20000
+        else:
+          - action: log
+            message: "QR code already visible"
+
+      # 5. Extract QR code - handle both img (src) and canvas (toDataURL)
+      - id: extract_qr
+        action: eval
+        script: |
+          (function() {
+            var el = document.querySelector("[aria-label='Scan this QR code to link a device!']");
+            if (!el) return null;
+            
+            // If it's a canvas, use toDataURL
+            if (el.tagName === 'CANVAS') {
+              return el.toDataURL('image/png').split(',')[1];
+            }
+            
+            // If it's an img, get src (may be data URL or blob)
+            if (el.tagName === 'IMG') {
+              var src = el.src;
+              if (src.startsWith('data:image')) {
+                return src.split(',')[1];
+              }
+              // For blob URLs, return the URL itself
+              return src;
+            }
+            
+            return null;
+          })();
+        store_as: qr_base64
+
+      # 6. Build result
+      - action: eval
+        script: |
+          ({
+            status: {{store.qr_base64 | json}} ? 'qr_ready' : 'qr_not_found',
+            qr_code: {{store.qr_base64 | json}} || null
+          })
+        store_as: result
+
+  - action: log
+    message: "QR code retrieval completed with status: {{store.result.status}}"
+
+output:
+  status: "{{store.result.status}}"
+  qr_code: "{{store.result.qr_code}}"
+  is_authenticated: "{{store.ready.authorized}}"
+
+on_error:
+  screenshot: true
+  emit:
+    event: whatsapp_qr_error
+    data:
+      error: "Failed to retrieve QR code"
