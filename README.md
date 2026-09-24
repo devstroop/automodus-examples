@@ -5,7 +5,7 @@ Reusable YAML workflows for Automodus. Each subdirectory is self-contained — p
 ```
 examples/
 ├── browser/
-│   ├── search_form.yaml      # DuckDuckGo search (goto, type, click, extract)
+│   ├── search_form.yaml      # Form fill on httpbingo.org (goto, type, click, extract)
 │   ├── screenshot.yaml       # Param screenshot service (viewport vs full_page)
 │   ├── scrape_list.yaml      # Scrape titles/prices/ratings (extract many)
 │   ├── multi_tab.yaml        # tab.new / switch / list / close (numeric indices)
@@ -101,4 +101,4 @@ Registered actions only: `goto/back/forward/reload`, `click/type/select/hover`, 
 
 Template filters: `{{path}}` (raw string) and `{{path | json}}` (JSON-encoded literal — missing paths become `null`). Prefer `| json` whenever the value is embedded in a JS expression.
 
-Stable public endpoints used here: `example.com`, `books.toscrape.com`, `httpbingo.org`, `jsonplaceholder.typicode.com`.
+Stable public endpoints used here: `books.toscrape.com`, `httpbingo.org`, `jsonplaceholder.typicode.com`, `the-internet.herokuapp.com`.

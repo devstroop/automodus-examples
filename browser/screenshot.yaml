@@ -11,7 +11,7 @@ description: Take a viewport or full-page screenshot of any URL
 params:
   url:
     type: string
-    default: "https://example.com"
+    default: "https://books.toscrape.com/"
     description: Page to capture
   name:
     type: string

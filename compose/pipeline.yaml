@@ -23,16 +23,17 @@ browser:
 params:
   site_url:
     type: string
-    default: "https://example.com/login"
+    default: "https://the-internet.herokuapp.com/login"
   username:
     type: string
-    default: "demo"
+    # the-internet.herokuapp.com demo credentials (shown on the login page)
+    default: "tomsmith"
   password:
     type: string
-    default: "demo123"
+    default: "SuperSecretPassword!"
   settings_path:
     type: string
-    default: "/settings"
+    default: "/"
     description: "Path appended to the site origin (not the full post-login URL)"
 
 steps:

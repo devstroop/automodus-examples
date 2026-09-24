@@ -14,12 +14,12 @@ browser:
 steps:
   - id: open_first
     action: goto
-    url: "https://example.com"
+    url: "https://books.toscrape.com/"
 
   # Opens tab index 1 and focuses it
   - id: open_second
     action: tab.new
-    url: "https://books.toscrape.com/"
+    url: "https://books.toscrape.com/catalogue/category/books/travel_2/index.html"
 
   - id: list_after_open
     action: tab.list

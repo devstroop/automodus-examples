@@ -1,18 +1,23 @@
 # Search Form Interaction Workflow
 # Demonstrates click, type, and wait_for actions
+#
+# Uses httpbingo.org's pizza form — a stable sandbox with real inputs.
+# DuckDuckGo's SPA no longer exposes reliable input[name='q'] / result
+# data-testid selectors for automation demos.
 
 name: search_form
-description: Fill and submit a search form on DuckDuckGo
+description: Fill and submit a form on httpbingo.org
 version: "1.0"
 
 browser:
-  headless: false
+  headless: true
 
 params:
   query:
     type: string
     required: true
     default: "browser automation"
+    description: Value typed into the customer-name field
 
 triggers:
   manual: true
@@ -21,54 +26,61 @@ triggers:
     method: POST
 
 steps:
-  # Navigate to DuckDuckGo
   - id: navigate
     action: goto
-    url: "https://duckduckgo.com"
+    url: "https://httpbingo.org/forms/post"
 
-  # Wait for search input to be ready
   - id: wait_for_input
     action: wait_for
-    selector: "input[name='q']"
+    selector: "input[name='custname']"
     timeout: 10000
 
-  # Type search query
   - id: type_query
     action: type
-    selector: "input[name='q']"
+    selector: "input[name='custname']"
     text: "{{params.query}}"
     clear: true
 
-  # Click search button
+  - id: type_comments
+    action: type
+    selector: "textarea[name='comments']"
+    text: "Submitted via Automodus workflow"
+    clear: true
+
+  # Submit the form — httpbingo returns a JSON echo of the POST body
   - id: click_search
     action: click
-    selector: "button[type='submit']"
+    selector: "button[type='submit'], button"
 
-  # Wait for results to load
+  # After submit the page becomes a JSON document; wait for body text.
+  # wait_for text tolerates transient CDP context loss during navigation.
   - id: wait_for_results
     action: wait_for
-    selector: "[data-testid='result']"
+    text: "custname"
     timeout: 15000
 
-  # Extract first result title
+  - id: wait_body
+    action: wait_for
+    selector: "body"
+    timeout: 10000
+
+  # Extract the echoed customer name from the JSON response
   - id: extract_first_result
     action: extract
-    selector: "[data-testid='result-title-a']"
-    as: first_result
+    selector: "body"
+    as: response_body
 
-  # Take screenshot of results
   - id: screenshot_results
     action: screenshot
     path: "data/screenshots/search_results.png"
 
-  # Log completion
   - id: log_done
     action: log
-    message: "Search completed for: {{params.query}}"
+    message: "Form submitted for: {{params.query}}"
 
 output:
   query: "{{params.query}}"
-  first_result: "{{store.first_result}}"
+  first_result: "{{store.response_body}}"
   screenshot: "data/screenshots/search_results.png"
 
 on_error:

@@ -32,7 +32,7 @@ debug:
 steps:
   - id: navigate
     action: goto
-    url: "https://example.com"
+    url: "https://books.toscrape.com/"
 
   - id: wait_ready
     action: wait_for
@@ -53,7 +53,7 @@ steps:
   # Back to workflow-level debug for the rest
   - id: click_link
     action: click
-    selector: "a[href*='iana']"
+    selector: "a[href*='travel']"
 
   - id: wait_nav
     action: wait_for

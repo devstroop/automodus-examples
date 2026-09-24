@@ -40,9 +40,13 @@ steps:
     action: click
     selector: "button[type='submit'], input[type='submit'], #login-btn"
 
+  # Wait for post-login navigation — `body` exists on the pre-submit page too,
+  # so waiting for body returns immediately and races the redirect (CDP
+  # "Cannot find context"). the-internet redirects to /secure on success.
+  # Wrong credentials never leave /login → this times out with a clear error.
   - id: wait_nav
     action: wait_for
-    selector: "[data-testid='dashboard'], .dashboard, #main-content"
+    url: "secure"
     timeout: 15000
 
   # CDP Runtime.evaluate does not allow a top-level `return`
@@ -51,6 +55,31 @@ steps:
     script: "window.location.href"
     store_as: final_url
 
+  # Confirm we're not on a login/error page (defense in depth)
+  - id: check_login
+    action: eval
+    script: |
+      (function() {
+        var url = window.location.href || '';
+        var err = document.querySelector('.flash.error, #flash.error, .error');
+        var errText = err ? (err.textContent || '') : '';
+        var onLogin = /\/login/i.test(url);
+        var failed = !!errText || onLogin;
+        return { url: url, error: errText, success: !failed };
+      })()
+    store_as: login_check
+
+  - id: assert_login
+    action: eval
+    script: |
+      (function() {
+        var c = {{store.login_check | json}};
+        if (!c || !c.success) {
+          throw new Error('Login failed: ' + ((c && c.error) || 'still on login page'));
+        }
+        return true;
+      })()
+
 output:
-  logged_in: true
+  logged_in: "{{store.login_check.success}}"
   url: "{{store.final_url}}"

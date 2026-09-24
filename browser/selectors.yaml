@@ -16,10 +16,10 @@ browser:
   headless: true
 
 steps:
-  # Start from a known page — extracts below assume example.com is loaded
-  - id: open_example
+  # Start from a known page — extracts below assume books.toscrape.com is loaded
+  - id: open_catalog
     action: goto
-    url: "https://example.com"
+    url: "https://books.toscrape.com/"
 
   - id: wait_page
     action: wait_for
@@ -38,32 +38,32 @@ steps:
   # --- CSS attribute selector + extract attribute ---
   - id: css_link_href
     action: extract
-    selector: "a[href*='iana']"
+    selector: "a[href*='travel']"
     attribute: href
-    as: iana_href
+    as: travel_href
 
   - action: log
-    message: "CSS attr href: {{store.iana_href}}"
+    message: "CSS attr href: {{store.travel_href}}"
 
   # --- Exact text (clickable) ---
   - id: wait_text
     action: wait_for
-    text: "Example Domain"
+    text: "Books to Scrape"
     timeout: 10000
 
   - id: text_extract
     action: extract
-    selector: "text:More information..."
+    selector: "text:Home"
     attribute: href
-    as: more_info_href
+    as: home_href
 
   - action: log
-    message: "text: link -> {{store.more_info_href}}"
+    message: "text: link -> {{store.home_href}}"
 
   # --- Partial text ---
   - id: text_partial
     action: extract
-    selector: "text*:More information"
+    selector: "text*:Books to Scrape"
     as: partial_text
 
   - action: log
@@ -72,7 +72,7 @@ steps:
   # --- ARIA role + accessible name ---
   - id: role_heading
     action: extract
-    selector: "role:heading[Example Domain]"
+    selector: "role:heading[All products]"
     as: role_heading_text
 
   - action: log
@@ -80,7 +80,7 @@ steps:
 
   - id: role_link
     action: click
-    selector: "role:link[More information...]"
+    selector: "role:link[Home]"
 
   # Follow the link, then go back for the XPath demo
   - id: wait_nav

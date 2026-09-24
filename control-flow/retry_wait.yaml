@@ -21,7 +21,7 @@ browser:
 steps:
   - id: navigate
     action: goto
-    url: "https://example.com"
+    url: "https://books.toscrape.com/"
     retry:
       max: 2
       delay_ms: 1000
@@ -36,7 +36,7 @@ steps:
   # Wait until body text appears
   - id: wait_text
     action: wait_for
-    text: "Example Domain"
+    text: "All products"
     timeout: 10000
 
   # state: present — exists in DOM (even if hidden); here it also implies visible
