@@ -84,8 +84,8 @@ These are real engine behaviors, not style preferences:
 
 | Pitfall | What happens | Do this instead |
 |---|---|---|
-| `action: loop` | Parses, then **ActionNotFound** at runtime | Unroll steps, or `call` a sub-workflow |
-| Step-level `on_success` / `on_failure` | Schema fields, **silently ignored** by the engine | Use `if:` / `action: condition`, workflow `on_error` |
+| Loop `as:` variable referenced bare (`{{item}}`) | Bare `{{…}}` reads **store**, so it stays unresolved | `{{vars.item}}` (loops bind item/index into vars, scoped to the loop) |
+| Step-level `on_success` / `on_failure: goto:` | Target id must exist in the **same step list** (validate fails otherwise) | Keep handler jump targets in the enclosing list |
 | `sleep: "2s"` or `duration: "2s"` | `as_u64` fails → **1000ms** | `ms: 2000` (numeric only) |
 | `wait_for timeout: "5s"` | String ignored → **30000ms** | `timeout: 5000` (numeric ms) |
 | `tab.switch index: "{{steps.x.tab_index}}"` | Rendered string fails `as_u64` | Hardcode numeric `index:` (initial tab = 0, first `tab.new` = 1) |

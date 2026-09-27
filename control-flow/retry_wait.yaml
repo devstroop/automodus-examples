@@ -8,8 +8,7 @@
 #
 # Notes:
 #   - timeout is numeric milliseconds (string "5s" falls back to 30000)
-#   - step-level on_success / on_failure parse but are NOT executed by the engine
-#   - there is no `loop` action in the runtime registry
+#   - step-level on_success / on_failure are executed (emit / goto / abort / steps)
 
 name: retry_wait
 version: "1.0"

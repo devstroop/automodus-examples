@@ -239,8 +239,9 @@ steps:
       - action: emit
         event: bulk_message_aborted
 
-  # NOTE: `action: loop` parses but is not registered (ActionNotFound at
-  # runtime). Unroll recipients explicitly, or call a sub-workflow per step:
+  # NOTE: `action: loop` is supported (bind items with `as:` and read them as
+  # `{{vars.item}}`). Unrolling recipients explicitly also works, or call a
+  # sub-workflow per step:
   #
   #   - action: call
   #     workflow: whatsapp/whatsapp

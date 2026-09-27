@@ -3,6 +3,8 @@
 # Opens a second tab, switches between tabs, lists them, then closes the extra tab.
 # Tab indices: the initial page is always 0; the first tab.new returns 1.
 # index must be a numeric literal — template-rendered strings fail as_u64().
+# Engine note: requires chromium or firefox — lightpanda supports a single
+# page per connection (tab.new fails with TargetAlreadyLoaded).
 
 name: multi_tab
 version: "1.0"

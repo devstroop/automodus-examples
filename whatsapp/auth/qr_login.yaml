@@ -50,8 +50,8 @@ steps:
       - action: sleep
         ms: 1500
 
-      # 4. If QR is missing, try refreshing it (step-level on_failure is
-      #    never executed by the engine — use an explicit condition instead)
+      # 4. If QR is missing, try refreshing it (this flow uses an explicit
+      #    condition; step-level on_failure handlers are supported too)
       - id: check_qr_visible
         action: eval
         script: |
