@@ -82,19 +82,32 @@ steps:
     action: click
     selector: "role:link[Home]"
 
-  # Follow the link, then go back for the XPath demo
+  # Follow the link, then go back for the XPath demo.
+  # Wait for the real URL and a rendered h1: `body` exists on the old page
+  # too, and firing `back` while the new page is still committing lands on
+  # the wrong history entry (about:home / root) on some engines.
   - id: wait_nav
     action: wait_for
-    selector: "body"
-    timeout: 10000
+    url: "starts:https://books.toscrape.com/index.html"
+    timeout: 20000
+
+  - id: wait_nav_h1
+    action: wait_for
+    selector: "h1"
+    timeout: 20000
 
   - id: go_back
     action: back
 
   - id: wait_home
     action: wait_for
+    url: "https://books.toscrape.com/"
+    timeout: 20000
+
+  - id: wait_home_h1
+    action: wait_for
     selector: "h1"
-    timeout: 10000
+    timeout: 20000
 
   # --- XPath ---
   - id: xpath_heading
