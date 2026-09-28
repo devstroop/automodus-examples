@@ -45,6 +45,7 @@ automodus list
 automodus run examples/browser/search_form.yaml query="rust automation"
 automodus run examples/browser/screenshot.yaml name=home full_page=false
 automodus run examples/http/headers_auth.yaml token=secret-123
+automodus run examples/http/http_api.yaml user_id=1
 automodus run examples/control-flow/branching.yaml mode=ok
 automodus run examples/control-flow/retry_wait.yaml
 automodus run examples/debug/debug_demo.yaml
@@ -84,6 +85,7 @@ These are real engine behaviors, not style preferences:
 
 | Pitfall | What happens | Do this instead |
 |---|---|---|
+| Loop `items: "{{vars.sites}}"` holding a sequence | Template renders a YAML string → loop sees **one** item | `items: "{{vars.sites \| json}}"` (only the `\| json` form preserves a sequence) |
 | Loop `as:` variable referenced bare (`{{item}}`) | Bare `{{…}}` reads **store**, so it stays unresolved | `{{vars.item}}` (loops bind item/index into vars, scoped to the loop) |
 | Step-level `on_success` / `on_failure: goto:` | Target id must exist in the **same step list** (validate fails otherwise) | Keep handler jump targets in the enclosing list |
 | `sleep: "2s"` or `duration: "2s"` | `as_u64` fails → **1000ms** | `ms: 2000` (numeric only) |
@@ -97,8 +99,40 @@ These are real engine behaviors, not style preferences:
 | `'{{params.x}}'` inside JS | Raw interpolation breaks on quotes / injects JS | Use `{{params.x \| json}}` (no surrounding quotes), or a native `type:` action input |
 | HTTP body field with template | Always rendered as YAML string unless full-string `{{path \| json}}` | `userId: "{{params.user_id \| json}}"` keeps number/bool/null type |
 
-Registered actions only: `goto/back/forward/reload`, `click/type/select/hover`, `wait_for/sleep`, `extract/eval`, `screenshot`, `tab.list/new/switch/close`, `emit/log`, `upload/wait_upload/file_chooser`, `http.get/post/put/patch/delete/request`, plus engine specials `call` and `condition`.
+Registered actions only: `goto/back/forward/reload`, `click/type/select/hover`, `wait_for/sleep`, `extract/eval`, `screenshot`, `tab.list/new/switch/close`, `emit/log`, `upload/wait_upload/file_chooser`, `http.get/post/put/patch/delete/request`, plus engine pseudo-actions `loop`, `call` and `condition` (special forms dispatched by the engine rather than by action implementations).
 
 Template filters: `{{path}}` (raw string) and `{{path | json}}` (JSON-encoded literal — missing paths become `null`). Prefer `| json` whenever the value is embedded in a JS expression.
+
+## Engines & smoke
+
+Examples run on any of the three engines — pick one in `config/app.toml`
+(`browser.engine`) or via env (`AUTOMODUS_BROWSER_ENGINE=firefox`):
+
+| Engine | Backends | Caveats |
+|---|---|---|
+| `chromium` (default) | CDP | Full capability: `upload`/`wait_upload`/`file_chooser` and `pdf` work |
+| `firefox` | WebDriver BiDi (no geckodriver) | `upload`/`file_chooser`/`pdf` are Chromium-only and fail with "unsupported" |
+| `lightpanda` | CDP attach to spawned `lightpanda serve` | Same Chromium-only restrictions; lighter but less complete |
+
+Headed workflows (`browser.headless: false`) need an X server; the smoke
+runner wraps them in `xvfb-run` when `DISPLAY` is unset.
+
+The engine-matrix smoke suite lives in the main repo and keeps its workflow
+list in sync with the Run section above:
+
+```bash
+# in devstroop/automodus
+scripts/smoke.sh                 # all engines: chromium firefox lightpanda
+scripts/smoke.sh chromium        # single engine
+```
+
+It runs `automodus validate examples` first, then each standalone workflow
+(no required params, no WhatsApp session).
+
+## Repos
+
+- Engine + docs: [github.com/devstroop/automodus](https://github.com/devstroop/automodus)
+  (this directory is its `examples` submodule)
+- This pack: [github.com/devstroop/automodus-examples](https://github.com/devstroop/automodus-examples)
 
 Stable public endpoints used here: `books.toscrape.com`, `httpbingo.org`, `jsonplaceholder.typicode.com`, `the-internet.herokuapp.com`.

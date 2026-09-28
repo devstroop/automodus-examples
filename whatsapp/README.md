@@ -104,24 +104,39 @@ automodus run examples/whatsapp/chat/get_chats.yaml limit=20
 
 ### API Usage
 
+The daemon HTTP server (default `http://127.0.0.1:8080`) exposes one generic
+endpoint per workflow — there are no `/whatsapp/*` routes. Start the daemon
+with the examples loaded so the workflows are registered:
+
 ```bash
+export AUTOMODUS_WORKFLOWS=$PWD/examples
+automodus daemon start
+
 # Check auth
-curl http://localhost:3000/whatsapp/auth/status
+curl -X POST http://127.0.0.1:8080/api/workflows/whatsapp_check_status/run \
+  -H "Content-Type: application/json" -d '{"params": {}}'
 
 # Send text
-curl -X POST http://localhost:3000/whatsapp/send/text \
+curl -X POST http://127.0.0.1:8080/api/workflows/whatsapp_send_text/run \
   -H "Content-Type: application/json" \
-  -d '{"phone": "+919876543210", "message": "Hello from Automodus!"}'
+  -d '{"params": {"phone": "+919876543210", "message": "Hello from Automodus!"}}'
 
 # Get chats
-curl "http://localhost:3000/whatsapp/chats?limit=20"
+curl -X POST http://127.0.0.1:8080/api/workflows/whatsapp_get_chats/run \
+  -H "Content-Type: application/json" -d '{"params": {"limit": 20}}'
 
 # Get messages
-curl "http://localhost:3000/whatsapp/messages?chat_id=919876543210&limit=50"
+curl -X POST http://127.0.0.1:8080/api/workflows/whatsapp_get_messages/run \
+  -H "Content-Type: application/json" \
+  -d '{"params": {"chat_id": "919876543210", "limit": 50}}'
 
 # Watch for new messages
-curl http://localhost:3000/whatsapp/watch
+curl -X POST http://127.0.0.1:8080/api/workflows/whatsapp_watch_messages/run \
+  -H "Content-Type: application/json" -d '{"params": {}}'
 ```
+
+The `on: api:` trigger blocks inside the workflow files are schema-only —
+they validate and document intent, but no HTTP route is created for them.
 
 ## Workflow Parameters
 
@@ -154,17 +169,32 @@ curl http://localhost:3000/whatsapp/watch
 
 ## Browser Configuration
 
-All WhatsApp workflows use these default browser settings:
+WhatsApp workflows set:
 
 ```yaml
 browser:
-  headless: false          # WhatsApp requires visible window for login
-  data_dir: "data/whatsapp_profile"  # Persistent session storage
+  headless: false          # WhatsApp requires a visible window for login
+  data_dir: "data/whatsapp_profile"
   width: 1280
   height: 800
 ```
 
-The `data_dir` ensures your WhatsApp session persists between workflow runs.
+What the engine actually honors today:
+
+- `headless: false` — ✅ used on `automodus run` (WhatsApp Web needs a
+  visible window while scanning the QR code).
+- `data_dir`, `width`, `height` — accepted by the schema but **not
+  consumed** by the launch paths; standalone runs use an isolated temp
+  profile that is deleted on exit, so login does **not** persist between
+  separate `automodus run` invocations.
+
+To keep a session alive, keep the browser alive: use the daemon
+(`automodus daemon start` + shell/API) and leave its session open, or stay
+in one shell session for the whole login + messaging flow.
+
+**Chromium-only:** `send`/`send_media`/`send_document` use the `upload`
+action (`DOM.setFileInputFiles`), which is supported on Chromium only —
+Firefox and Lightpanda report it as unsupported.
 
 ## CSS Selectors
 
@@ -199,9 +229,15 @@ Example error response:
 
 1. **Rate Limiting**: WhatsApp may temporarily block accounts that send messages too quickly. Add delays between messages.
 
-2. **Session Management**: The browser profile in `data/whatsapp_profile` keeps you logged in. Don't delete it unless you want to re-authenticate.
+2. **Session Management**: `data_dir` is not wired up yet (see Browser
+   Configuration), so each standalone run starts fresh — log in and act
+   within one shell session, or run against a daemon session that stays
+   open between operations.
 
-3. **Headless Mode**: WhatsApp Web requires a visible browser window during QR code scanning. After authentication, you may be able to use headless mode.
+3. **Headless Mode**: WhatsApp Web requires a visible browser window during
+   QR code scanning. Headless is not used by these workflows
+   (`headless: false`), and the daemon always launches with the config
+   headless setting.
 
 4. **Phone Format**: Always include country code (e.g., `+919876543210` or `919876543210`).
 
@@ -239,9 +275,13 @@ steps:
       - action: emit
         event: bulk_message_aborted
 
-  # NOTE: `action: loop` is supported (bind items with `as:` and read them as
-  # `{{vars.item}}`). Unrolling recipients explicitly also works, or call a
-  # sub-workflow per step:
+  # NOTE: `action: loop` is a pseudo-action (`items:`, `as:`, `index_as:`,
+  # `steps:`). Sequence-valued `items:` must keep their type:
+  #   items: "{{vars.recipients | json}}"   # ✅ one item per recipient
+  #   items: "{{vars.recipients}}"          # ❌ renders as a single string
+  # Loop vars are read as `{{vars.<as>}}` and, when `index_as:` is set,
+  # `{{vars.<index_as>}}`.
+  # Unrolling recipients explicitly also works, or call a sub-workflow per step:
   #
   #   - action: call
   #     workflow: whatsapp/whatsapp
